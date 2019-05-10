@@ -1,5 +1,5 @@
-####Simple simulation over QCLDPC decoding
+#### Simple simulation over QCLDPC decoding
 
-    _Sum product_
-    _Min sum_
-    _Normalize MS_
+_Sum product_
+_Min sum_
+_Normalize MS_
