@@ -1,10 +1,10 @@
 % QCLDPC performance analysis
 
 % check the path of the Base graph: 
+clear all;
 bspath = 'C:\Program Files\MATLAB\R2019a\toolbox\5g\5g\+nr5g\+internal\+ldpc\baseGraph';
 
 % parameters
-clear all;
 Es = 1;                             % energy per symbol
 max_iter = 15;                      % max iteration count
 bgn = 1;                            % bbase graph number
@@ -61,13 +61,13 @@ time_cnt = 0;
 
 % iterate C times
 for ii = 1:C
-    message = randi([0, 1], K-F, 1);
+    message = randi([0, 1], K, 1);
     ldpcEncOut = encldpc(message);
     modOut = pskModulator(ldpcEncOut);
     chanOut = chan(modOut);
     demodOut = pskDemodulator(chanOut);
     tic;
-    ldpcDecOut = mydecldpc.decodeMS(demodOut')';
+    ldpcDecOut = mydecldpc.decodeSP(demodOut')';
     time_cnt = time_cnt + toc;
     error_cnt = error_cnt + sum(message ~= ldpcDecOut, 'all');
 end
@@ -76,21 +76,21 @@ end
 num = 0;
 while error_cnt < thres
     num = num + 1;
-    message = randi([0, 1], K-F, 1);
+    message = randi([0, 1], K, 1);
     ldpcEncOut = encldpc(message);
     modOut = pskModulator(ldpcEncOut);
     chanOut = chan(modOut);
     demodOut = pskDemodulator(chanOut);
-    ldpcDecOut = mydecldpc.decodeMS(demodOut')';
+    ldpcDecOut = mydecldpc.decodeSP(demodOut')';
     error_cnt = error_cnt + sum(message ~= ldpcDecOut, 'all');
-    if error_cnt / (K-F) / (C+num) < err_limit
+    if error_cnt / K / (C+num) < err_limit
         running = false;
         break;
     end
 end
 
 % calculate BER & show
-ber_res(1,jj) = error_cnt / (K-F) / (C+num);
+ber_res(1,jj) = error_cnt / K / (C+num);
 fprintf("(MAT) BER is %.5f at snr %0.1fdB spending %03.2fs\n", ber_res(1,jj), snrdb(jj), time_cnt);
 
 if ~running
