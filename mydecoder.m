@@ -131,6 +131,49 @@ classdef mydecoder
             end
         end
 
+        % Layered Sum product decoding
+        function out = decodeSP_layer(obj, in)
+            % fprintf("Start decoding...\n\n");
+            E = zeros(obj.Row, obj.Col);
+            M = zeros(obj.Row, obj.Col);
+            L = in;
+            M = repmat(in,obj.Row,1).*obj.PCM;
+            for ii = 0 : obj.Max_iter+1
+                % fprintf("Iteration %d\n", ii);
+                out = obj.check(L);
+                % print_L = sprintf(repmat('%.4f ', 1, length(L)), L);
+                % print_out = sprintf(repmat('%1d ', 1, length(out)), out);
+                % fprintf("input sequence %s\n", print_L);
+                % fprintf("parity checking %s\n\n", print_out);
+                if(sum(out) == 0 || ii == obj.Max_iter)
+                    % fprintf("Done decoding...\n\n");
+                    out = L < 0;
+                    out = out(1,1:length(in)/obj.Col*(obj.Col - obj.Row));
+                    break;
+                else
+                    % for bg1 24 * 46
+                    BGRow = 24;
+                    Zc = 32;
+                    % per layer
+                    for kk = 1 : BGRow
+                        % M
+                        for jj = (kk-1)*Zc+1 : kk*Zc
+                            M(jj, obj.ppr{jj,1}) = tanh(M(jj, obj.ppr{jj,1})/2);
+                            T = prod(M(jj, obj.ppr{jj,1}));
+                            E(jj, obj.ppr{jj,1}) = T ./ M(jj, obj.ppr{jj,1});
+                            E(E(jj, obj.ppr{jj,1})>=0.9999999999999999) = 0.9999999999999999;
+                            E(E(jj, obj.ppr{jj,1})<=-0.9999999999999999) = -0.9999999999999999;
+                            E(jj, obj.ppr{jj,1}) = 2*atanh(E(jj, obj.ppr{jj,1}));
+                        end
+                        % E
+                        L = sum(E, 1) + in;
+                        M(obj.p) = L(obj.pmod)' - E(obj.p);
+                        % M
+                    end
+                end
+            end
+        end
+
         % parity checking
         function out = check(obj, in)
             in = in < 0;
