@@ -1,9 +1,9 @@
 % plot the BER-SNR curve
 
 % load ber data
-SP = load('SP.mat');
-MS = load('MS.mat');
-NMS = load('NMS.mat');
+SP = load('BER/SP.mat');
+MS = load('BER/MS.mat');
+NMS = load('BER/NMS.mat');
 max_len = max([length(SP.ber_res) length(MS.ber_res) length(NMS.ber_res)]);
 
 % padding 0 to the same length
