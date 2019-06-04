@@ -23,7 +23,7 @@ classdef mydecoder
             obj.Max_iter = Max_iter;
             obj.p = find(obj.PCM);
             obj.pmod = ceil(obj.p / obj.Row);
-            obj.ppr = obj.makePPR();
+            obj.ppr = obj.makePPR();            % save the place for 1's first
             obj.BGRow = obj.Row / Zc;
             obj.Zc = Zc;
         end
@@ -45,6 +45,7 @@ classdef mydecoder
                 else
                     M(obj.p) = tanh(M(obj.p)/2);
                     for jj = 1 : obj.Row
+                        ID = obj.ppr{jj,1};
                         T = prod(M(jj, ID));
                         E(jj, ID) = T ./ M(jj, ID);
                     end
@@ -70,10 +71,11 @@ classdef mydecoder
                     break;
                 else
                     for jj = 1 : obj.Row
-                        ID = ID;
+                        ID = obj.ppr{jj,1};;
                         neg_cnt = sum(M(jj, ID) < 0);
                         change = mod(neg_cnt, 2);
                         SG = sign(M(jj, ID));
+                        SG(SG==0) = 1;
                         M(jj, ID) = abs(M(jj, ID));
                         [O, idx] = sort(M(jj, ID));
                         E(jj, ID) = O(1);
@@ -84,41 +86,6 @@ classdef mydecoder
                             E(jj, ID) = E(jj, ID) .* SG;
                         end
                     end
-                    L = sum(E, 1) + in;
-                    M(obj.p) = L(obj.pmod)' - E(obj.p);
-                end
-            end
-        end
-
-        % normalize min-sum decoding
-        function out = decodeNMS(obj, in, Nor)
-            E = zeros(obj.Row, obj.Col);
-            M = zeros(obj.Row, obj.Col);
-            L = in;
-            M = repmat(in,obj.Row,1).*obj.PCM;
-            for ii = 0 : obj.Max_iter
-                out = obj.check(L);
-                if(sum(out) == 0 || ii == obj.Max_iter)
-                    out = L < 0;
-                    out = out(1,1:length(in)/obj.Col*(obj.Col - obj.Row));
-                    break;
-                else
-                    for jj = 1 : obj.Row
-                        ID = ID;
-                        neg_cnt = sum(M(jj, ID) < 0);
-                        change = mod(neg_cnt, 2);
-                        SG = sign(M(jj, ID));
-                        M(jj, ID) = abs(M(jj, ID));
-                        [O, idx] = sort(M(jj, ID));
-                        E(jj, ID) = O(1);
-                        E(jj, ID(idx(1))) = O(2);
-                        if change
-                            E(jj, ID) = -E(jj, ID) .* SG;
-                        else
-                            E(jj, ID) = E(jj, ID) .* SG;
-                        end
-                    end
-                    E(obj.p) = E(obj.p) * Nor;
                     L = sum(E, 1) + in;
                     M(obj.p) = L(obj.pmod)' - E(obj.p);
                 end
@@ -127,31 +94,20 @@ classdef mydecoder
 
         % Layered Sum product decoding
         function out = decodeSP_layer(obj, in)
-            % fprintf("Start decoding...\n\n");
-            % E = zeros(obj.Row, obj.Col);
             M = zeros(obj.Row, obj.Col);
             L = in;
-            % M = repmat(in,obj.Row,1).*obj.PCM;
             for ii = 0 : obj.Max_iter+1
-                % fprintf("Iteration %d\n", ii);
                 if sum(isnan(L)) ~= 0
                     error("NAN")
                 end
                 out = obj.check(L);
-                % print_L = sprintf(repmat('%.4f ', 1, length(L)), L);
-                % print_out = sprintf(repmat('%1d ', 1, length(out)), out);
-                % fprintf("input sequence %s\n", print_L);
-                % fprintf("parity checking %s\n\n", print_out);
                 if(sum(out) == 0 || ii == obj.Max_iter)
-                    % fprintf("Done decoding...\n\n");
                     out = L < 0;
                     out = out(1,1:length(in)/obj.Col*(obj.Col - obj.Row));
                     break;
                 else
-                    % for bg1 24 * 46
                     for kk = 1 : obj.BGRow                    % for each layer
                         for jj = (kk-1)*obj.Zc+1 : kk*obj.Zc  % for each row in the layer
-                            % ID
                             ID = obj.ppr{jj,1};
                             To(ID) = L(ID) - M(jj, ID);
                             
@@ -174,7 +130,6 @@ classdef mydecoder
                                 inf_place = ID(S);
                                 M(jj, inf_place) = sign(M(jj, inf_place))*38.14;
                             end
-
                             L(ID) = M(jj, ID) + To(ID);
                         end
                     end
@@ -195,11 +150,13 @@ classdef mydecoder
                 else
                     for kk = 1 : obj.BGRow                    % for each layer
                         for jj = (kk-1)*obj.Zc+1 : kk*obj.Zc  % for each row in the layer
+                            ID = obj.ppr{jj,1};
                             To(ID) = L(ID) - M(jj, ID);
                             ID = ID;
                             neg_cnt = sum(To(ID) < 0);
                             change = mod(neg_cnt, 2);
-                            SG = sign(To(ID));
+                            SG = double(sign(To(ID)));
+                            SG(SG == 0) = 1;
                             T(ID) = abs(To(ID));
                             [O, idx] = sort(T(ID));
                             M(jj, ID) = O(1);
@@ -212,6 +169,59 @@ classdef mydecoder
                             L(ID) = M(jj, ID) + To(ID);
                         end
                     end
+                end
+            end
+        end
+
+        % normalize MS quan, not optimize in MATLAB, may be slow
+        function out = decodeNMSq(obj, in, Nor, ntBP)
+            % the maximun number that can be represent by this type of fixed point
+            ep = realmax(fi(0, ntBP));
+            ep = ep.data;
+            % initialize
+            E = zeros(obj.Row, obj.Col);
+            M = zeros(obj.Row, obj.Col);
+            % quantize input
+            in(in > ep) = ep;
+            in(in < -ep) = -ep;
+            in = fi(in,ntBP);
+            L = in.data;
+            M = repmat(L,obj.Row,1).*obj.PCM;
+            for ii = 0 : obj.Max_iter
+                out = obj.check(L);
+                if(sum(out) == 0 || ii == obj.Max_iter)
+                    out = L < 0;
+                    out = out(1,1:length(in)/obj.Col*(obj.Col - obj.Row));
+                    break;
+                else
+                    % CTV
+                    for jj = 1 : obj.Row
+                        % find min1 and min2 per row
+                        ID = obj.ppr{jj,1};
+                        neg_cnt = sum(M(jj, ID) < 0);
+                        change = mod(neg_cnt, 2);
+                        SG = double(sign(M(jj, ID)));
+                        SG(SG == 0) = 1;
+                        M(jj, ID) = abs(M(jj, ID));
+                        [O, idx] = sort(M(jj, ID));
+                        E(jj, ID) = O(1);
+                        E(jj, ID(idx(1))) = O(2);
+                        if change
+                            E(jj, ID) = -E(jj, ID) .* SG;
+                        else
+                            E(jj, ID) = E(jj, ID) .* SG;
+                        end
+                    end
+                    % normalize
+                    temp = fi(E(obj.p), ntBP);
+                    temp = bitsra(temp,1) + bitsra(temp,2);
+                    E(obj.p) = temp.data;
+                    
+                    % VTC
+                    L = sum(E, 1) + in;
+                    M(obj.p) = L(obj.pmod)' - E(obj.p);
+                    M(obj.p(M(obj.p) > ep)) =  ep;
+                    M(obj.p(M(obj.p) < -ep)) =  -ep;
                 end
             end
         end

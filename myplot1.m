@@ -26,3 +26,4 @@ xlabel('SNR [dB]');
 xlim([0,4])
 ylim([10^(-6),1]);
 hold off;
+saveas(gcf, './figure/myplot1.png')

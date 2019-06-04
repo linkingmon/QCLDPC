@@ -1,20 +1,22 @@
 % QCLDPC performance analysis
-% modify mydecldpc.decodeSP with mydecldpc.decodeMS or mydecldpc.decodeNMS to run other algorithm
+% modify mydecldpc.decodeSP_layer with mydecldpc.decodeMS_layer to run other algorithm
 
 % check the path of the Base graph: 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear all;
 bspath = 'C:\Program Files\MATLAB\R2019a\toolbox\5g\5g\+nr5g\+internal\+ldpc\baseGraph';
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 % parameters
 Es = 1;                             % energy per symbol
 max_iter = 15;                      % max iteration count
 bgn = 1;                            % bbase graph number
 C = 1000;                           % minimun simulation times per SNR
-K = 22*32;                          % message length
+Zc = 32;                            % lifting size
+K = 22*Zc;                          % message length
 thres = 100;                        % minimun error count per SNR
 code_rate = 1/2;                    % code rate
 snrdb = [0:0.2:2.6];                % SNR for simultion (in dB)
-ber_res = zeros(1,length(snrdb));   % saving BER(bit error rate)
+ber_res = zeros(2,length(snrdb));   % saving BER(bit error rate)
 rng(0);                             % set random seed
 err_limit = 10e-6;                  % minimun error rate
 running = true;
@@ -24,7 +26,7 @@ running = true;
 
 % LDPC encode & decoder setting
 encldpc = comm.LDPCEncoder(LDPCParityCheckMatrix);
-mydecldpc = mydecoder(LDPCParityCheckMatrix, max_iter, 32);
+mydecldpc = mydecoder(LDPCParityCheckMatrix, max_iter, Zc);
 
 % simulate per SNR
 for jj = 1:length(snrdb)
@@ -68,7 +70,7 @@ for ii = 1:C
     chanOut = chan(modOut);
     demodOut = pskDemodulator(chanOut);
     tic;
-    ldpcDecOut = mydecldpc.decodeSP(demodOut')';
+    ldpcDecOut = mydecldpc.decodeSP_layer(demodOut')';
     time_cnt = time_cnt + toc;
     error_cnt = error_cnt + sum(message ~= ldpcDecOut, 'all');
 end
@@ -82,7 +84,7 @@ while error_cnt < thres
     modOut = pskModulator(ldpcEncOut);
     chanOut = chan(modOut);
     demodOut = pskDemodulator(chanOut);
-    ldpcDecOut = mydecldpc.decodeSP(demodOut')';
+    ldpcDecOut = mydecldpc.decodeSP_layer(demodOut')';
     error_cnt = error_cnt + sum(message ~= ldpcDecOut, 'all');
     if error_cnt / K / (C+num) < err_limit
         running = false;
