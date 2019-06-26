@@ -1,2 +1,8 @@
 a.exe
 .vscode
+verilog/Top/
+verilog/CNU.sv
+verilog/tb_top1.sv
+verilog/tb_bs.sv
+verilog/gentop.cpp
+verilog/permuter.sv

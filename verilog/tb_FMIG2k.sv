@@ -1,7 +1,6 @@
 `include "FMIG2.sv"
 module tb_FMIG2;
 parameter BITS = 5 + 3;
-parameter TEST = 5;
 // parameter INPUTS = 4;
 // parameter INPUTS = 16;
 parameter INPUTS = 256;
